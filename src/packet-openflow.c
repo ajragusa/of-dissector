@@ -10,13 +10,11 @@
  * Defines a Wireshark 1.0.0+ dissector for the OpenFlow protocol version 0x98.
  */
 
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
+
+#include <config.h>
 #include <epan/emem.h>
 #include <epan/packet.h>
 #include <epan/dissectors/packet-tcp.h>
@@ -24,9 +22,11 @@
 #include <epan/ipproto.h>
 #include <epan/etypes.h>
 #include <epan/addr_resolv.h>
+
 #include <string.h>
 #include <arpa/inet.h>
-#include <openflow/openflow.h>
+
+#include "openflow.h"
 
 /** the version of openflow this dissector was written for */
 #define DISSECTOR_OPENFLOW_MIN_VERSION OFP_VERSION
@@ -45,7 +45,7 @@ static void dissect_openflow(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
 /* traffic will arrive with TCP port OPENFLOW_DST_TCP_PORT */
 #define TCP_PORT_FILTER "tcp.port"
-static int global_openflow_proto = OPENFLOW_DST_TCP_PORT;
+static int global_openflow_proto = OFP_TCP_PORT;
 
 /* try to find the ethernet dissector to dissect encapsulated Ethernet data */
 static dissector_handle_t data_ethernet;

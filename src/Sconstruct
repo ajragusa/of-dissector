@@ -1,0 +1,57 @@
+# Copyright (c) 2010-2012 The Board of Trustees of The Leland Stanford Junior University
+
+import os
+import os.path
+import platform
+import zipfile
+import tarfile
+import sys
+
+env = Environment()
+
+PLAT_LIBS = []
+
+def get_version():
+  v = "Unknown"
+  ver_hpp = os.path.normpath("%s/moduleinfo.h" % os.getcwd())
+  f = open(ver_hpp, "rb")
+  for line in f:
+    if line.startswith("#define VERSION"):
+      v = line.split()[2].strip('"')
+
+  return v
+
+def error (msg):
+  print "### ERROR: %s" % (msg)
+
+if os.name == 'posix':
+  if not os.environ.has_key("WIRESHARK"):
+    error("You need to set the WIRESHARK environment variable to the location of your wireshark include directory.")
+    error("(such that epan/packet.h is a valid include path)")
+    sys.exit()
+  env.AppendUnique(
+    CPPPATH = [os.getcwd(),
+               os.environ['WIRESHARK']],
+    LIBPATH = ['/usr/lib',
+               '/usr/local/lib'])
+  env.ParseConfig('pkg-config --cflags --libs glib-2.0')
+
+  env['SHLIBPREFIX'] = ""
+  env['PKG_NAME'] = "plugin-%s-%s-%s" % (get_version(), os.uname()[0].lower(), platform.architecture()[0])
+
+#  bld_pkg = Builder(action=package_posix, src_suffix='.so')
+#  env.AppendUnique(BUILDERS = {"Package" : bld_pkg})
+
+src_files = Split("""
+  packet-openflow.c
+  plugin.c
+  """)
+
+objects = []
+
+target_plugin = env.SharedLibrary('openflow', source = [src_files, objects], LIBS=PLAT_LIBS)
+
+target_install = env.Install(os.path.expanduser('~/.wireshark/plugins/'), target_plugin)
+env.Alias('install', target_install)
+
+Default(target_plugin)
