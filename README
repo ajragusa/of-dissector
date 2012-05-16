@@ -8,6 +8,15 @@
 4. Install Scons if you don't already have it
 5. cd src; scons install
 
+== Building on MacOS X ==
+
+The build has been tested on MacOS X 10.7.4 with Xcode 4.2.  Wireshark needs to be
+installed via Brew, although you *also* still need the wireshark source download that
+matches the version installed by Brew.  After installing with Brew, you can run
+./configure in the Wireshark source download to generate the config.h that matches
+your environment and then set the WIRESHARK environment variable as you would given
+the instructions above.  Once you have installed wireshark, generated config.h, and
+set the WIRESHARK environment variable, the plugin should build as on linux.
 
 == Dependencies / Requirements ==
 This plugin should build on any posix-compliant system that looks like Linux or *BSD,
