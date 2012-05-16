@@ -1,4 +1,5 @@
 # Copyright (c) 2010-2012 The Board of Trustees of The Leland Stanford Junior University
+# Copyright (c) 2012 Barnstormer Softworks
 
 import os
 import os.path
@@ -10,6 +11,7 @@ import sys
 env = Environment()
 
 PLAT_LIBS = []
+INSTALLPATH = ""
 
 def get_version():
   v = "Unknown"
@@ -34,6 +36,13 @@ if os.name == 'posix':
                os.environ['WIRESHARK']],
     LIBPATH = ['/usr/lib',
                '/usr/local/lib'])
+
+  INSTALLPATH = os.path.expanduser('~/.wireshark/plugins/')
+
+  if os.uname()[0] == "Darwin":
+    PLAT_LIBS.append('wireshark')
+    env.Replace(SHLIBSUFFIX = ".so")
+
   env.ParseConfig('pkg-config --cflags --libs glib-2.0')
 
   env['SHLIBPREFIX'] = ""
@@ -51,7 +60,7 @@ objects = []
 
 target_plugin = env.SharedLibrary('openflow', source = [src_files, objects], LIBS=PLAT_LIBS)
 
-target_install = env.Install(os.path.expanduser('~/.wireshark/plugins/'), target_plugin)
+target_install = env.Install(INSTALLPATH, target_plugin)
 env.Alias('install', target_install)
 
 Default(target_plugin)
