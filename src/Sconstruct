@@ -48,8 +48,16 @@ if os.name == 'posix':
   env['SHLIBPREFIX'] = ""
   env['PKG_NAME'] = "plugin-%s-%s-%s" % (get_version(), os.uname()[0].lower(), platform.architecture()[0])
 
-#  bld_pkg = Builder(action=package_posix, src_suffix='.so')
-#  env.AppendUnique(BUILDERS = {"Package" : bld_pkg})
+  def package_posix(target, source, env):
+    src = source[0].path
+    tpath = "%s.tgz" % (target[0].path)
+    t = tarfile.open(tpath, "w:gz")
+    t.add(src)
+    t.close()
+
+  bld_pkg = Builder(action=package_posix, src_suffix='.so')
+  env.AppendUnique(BUILDERS = {"Package" : bld_pkg})
+
 
 src_files = Split("""
   packet-openflow.c
@@ -59,6 +67,9 @@ src_files = Split("""
 objects = []
 
 target_plugin = env.SharedLibrary('openflow', source = [src_files, objects], LIBS=PLAT_LIBS)
+
+target_package = env.Package(env['PKG_NAME'], source = target_plugin)
+env.Alias('package', target_package)
 
 target_install = env.Install(INSTALLPATH, target_plugin)
 env.Alias('install', target_install)
