@@ -1,5 +1,5 @@
 # Copyright (c) 2010-2012 The Board of Trustees of The Leland Stanford Junior University
-# Copyright (c) 2012 Barnstormer Softworks
+# Copyright (c) 2012-2013 Barnstormer Softworks
 
 import os
 import os.path
@@ -7,13 +7,18 @@ import platform
 import zipfile
 import tarfile
 import sys
+import subprocess
 
-env = Environment()
+env = Environment(LINKFLAGS = '-flat_namespace')
+
+# You can set use_brew=1 at the command line and we'll try to figure out
+# how brew installed your wireshark and do all the heavy lifting for you
+use_brew = bool(int(ARGUMENTS.get('use_brew', 0)))
 
 PLAT_LIBS = []
 INSTALLPATH = ""
 
-def get_version():
+def get_version ():
   v = "Unknown"
   ver_hpp = os.path.normpath("%s/moduleinfo.h" % os.getcwd())
   f = open(ver_hpp, "rb")
@@ -23,10 +28,33 @@ def get_version():
 
   return v
 
+def brew_setup ():
+  cdir = os.getcwd()
+  formula = subprocess.check_output("brew cat wireshark", shell=True)
+  for line in formula.split("\n"):
+    if line.strip().startswith("url"):
+      # Don't look now, heinous things happen to strings in here
+      url = line[line.index("'")+1:-1]
+      break
+  os.chdir("/tmp/")
+  subprocess.call("wget %s" % (url), shell=True)
+  # MacOS X tar recognizes compressed input without help
+  subprocess.call("tar -xf %s" % (url.split("/")[-1]), shell=True)
+  os.chdir(url.split("/")[-1][:-8])
+  subprocess.call("PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig/:/usr/local/lib/pkgconfig/ ./configure", shell=True)
+  os.environ["WIRESHARK"] = os.getcwd()
+  os.chdir(cdir)
+  
 def error (msg):
   print "### ERROR: %s" % (msg)
 
 if os.name == 'posix':
+  if os.uname()[0] == "Darwin":
+    PLAT_LIBS.append('wireshark')
+    env.Replace(SHLIBSUFFIX = ".so")
+    if use_brew:
+      brew_setup()
+
   if not os.environ.has_key("WIRESHARK"):
     error("You need to set the WIRESHARK environment variable to the location of your wireshark include directory.")
     error("(such that epan/packet.h is a valid include path)")
@@ -38,10 +66,6 @@ if os.name == 'posix':
                '/usr/local/lib'])
 
   INSTALLPATH = os.path.expanduser('~/.wireshark/plugins/')
-
-  if os.uname()[0] == "Darwin":
-    PLAT_LIBS.append('wireshark')
-    env.Replace(SHLIBSUFFIX = ".so")
 
   env.ParseConfig('pkg-config --cflags --libs glib-2.0')
 
