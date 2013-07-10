@@ -9,7 +9,7 @@ import tarfile
 import sys
 import subprocess
 
-env = Environment(LINKFLAGS = '-flat_namespace')
+env = Environment()
 
 # You can set use_brew=1 at the command line and we'll try to figure out
 # how brew installed your wireshark and do all the heavy lifting for you
@@ -52,6 +52,7 @@ if os.name == 'posix':
   if os.uname()[0] == "Darwin":
     PLAT_LIBS.append('wireshark')
     env.Replace(SHLIBSUFFIX = ".so")
+    env.Replace(LINKFLAGS = "-flat_namespace")
     if use_brew:
       brew_setup()
 
