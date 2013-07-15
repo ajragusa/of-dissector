@@ -766,7 +766,7 @@ static gint ett_ofp_error_msg_data = -1;
 void proto_reg_handoff_openflow()
 {
     openflow_handle = create_dissector_handle(dissect_openflow, proto_openflow);
-    dissector_add(TCP_PORT_FILTER, global_openflow_proto, openflow_handle);
+    dissector_add_uint(TCP_PORT_FILTER, global_openflow_proto, openflow_handle);
 }
 
 #define NO_STRINGS NULL
@@ -2232,7 +2232,7 @@ static void dissect_dl_type(proto_tree* tree, gint hf, tvbuff_t *tvb, guint32 *o
     /* get the datalink type */
     guint16 dl_type = tvb_get_ntohs( tvb, *offset );
 
-	const char* description = match_strval(dl_type, etype_vals);
+    const char* description = try_val_to_str(dl_type, etype_vals);
 
     /* put the string-representation in the GUI tree */
     proto_tree_add_uint_format(tree, hf, tvb, *offset, 2, dl_type,
