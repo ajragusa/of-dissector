@@ -41,7 +41,7 @@
 /* Wireshark ID of the OPENFLOW protocol */
 static int proto_openflow = -1;
 static dissector_handle_t openflow_handle;
-static void dissect_openflow(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
+static int dissect_openflow(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data);
 
 /* traffic will arrive with TCP port OPENFLOW_DST_TCP_PORT */
 #define TCP_PORT_FILTER "tcp.port"
@@ -1944,7 +1944,7 @@ void proto_register_openflow()
 
     proto_register_field_array(proto_openflow, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-    register_dissector("openflow", dissect_openflow, proto_openflow);
+    register_dissector("openflow_aj", dissect_openflow, proto_openflow);
 }
 
 const char* ofp_type_to_string( gint8 type ) {
@@ -2261,7 +2261,7 @@ static void dissect_tp_port(proto_tree* tree, gint hf, tvbuff_t *tvb, guint32 *o
 
     /* put the string-representation in the GUI tree */
     proto_tree_add_uint_format(tree, hf, tvb, *offset, 2, port,
-            "%s: %s (%u)", hfinfo->name, get_tcp_port(port), port);
+			       "%s: %s (%u)", hfinfo->name,"6633", port);
 
     *offset += 2;
 }
@@ -2724,11 +2724,9 @@ static void dissect_switch_features_actions(tvbuff_t *tvb, packet_info *pinfo, p
 
 static void dissect_ethernet(tvbuff_t *next_tvb, packet_info *pinfo, proto_tree *data_tree) {
     /* add seperators to existing column strings */
-    if (check_col(pinfo->cinfo, COL_PROTOCOL))
-        col_append_str( pinfo->cinfo, COL_PROTOCOL, "+" );
+  col_append_str( pinfo->cinfo, COL_PROTOCOL, "+" );
 
-    if(check_col(pinfo->cinfo,COL_INFO))
-        col_append_str( pinfo->cinfo, COL_INFO, " => " );
+  col_append_str( pinfo->cinfo, COL_INFO, " => " );
 
     /* set up fences so ethernet dissectors only appends to our column info */
     col_set_fence(pinfo->cinfo, COL_PROTOCOL);
@@ -2819,18 +2817,16 @@ static void dissect_flow_mod_flags(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 }
 
 
-static void dissect_openflow_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+static int dissect_openflow_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
 #   define STR_LEN 1024
     char str[STR_LEN];
 
     /* display our protocol text if the protocol column is visible */
-    if (check_col(pinfo->cinfo, COL_PROTOCOL))
-        col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_TAG_OPENFLOW);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_TAG_OPENFLOW);
 
     /* Clear out stuff in the info column */
-    if(check_col(pinfo->cinfo,COL_INFO))
-        col_clear(pinfo->cinfo,COL_INFO);
+    col_clear(pinfo->cinfo,COL_INFO);
 
     /* get some of the header fields' values for later use */
     guint8  ver  = tvb_get_guint8( tvb, 0 );
@@ -2856,21 +2852,20 @@ static void dissect_openflow_message(tvbuff_t *tvb, packet_info *pinfo, proto_tr
     }
 
     /* clarify protocol name display with version, length, and type information */
-    if (check_col(pinfo->cinfo, COL_INFO)) {
-        /* special handling so we can put buffer IDs in the description */
-        char str_extra[32];
-        str_extra[0] = '\0';
-        if( type==OFPT_PACKET_IN || type==OFPT_PACKET_OUT ) {
-            guint32 bid = tvb_get_ntohl(tvb, sizeof(struct ofp_header));
-            if( bid != 0xFFFFFFFF )
-                snprintf(str_extra, 32, "(BufID=%u) ", bid);
-        }
-
-        if( ver_warning )
-            col_add_fstr( pinfo->cinfo, COL_INFO, "%s %s(%uB) Ver Warning!", ofp_type_to_string(type), str_extra, len );
-        else
-            col_add_fstr( pinfo->cinfo, COL_INFO, "%s %s(%uB)", ofp_type_to_string(type), str_extra, len );
+    /* special handling so we can put buffer IDs in the description */
+    char str_extra[32];
+    str_extra[0] = '\0';
+    if( type==OFPT_PACKET_IN || type==OFPT_PACKET_OUT ) {
+      guint32 bid = tvb_get_ntohl(tvb, sizeof(struct ofp_header));
+      if( bid != 0xFFFFFFFF )
+	snprintf(str_extra, 32, "(BufID=%u) ", bid);
     }
+
+    if( ver_warning )
+      col_add_fstr( pinfo->cinfo, COL_INFO, "%s %s(%uB) Ver Warning!", ofp_type_to_string(type), str_extra, len );
+    else
+      col_add_fstr( pinfo->cinfo, COL_INFO, "%s %s(%uB)", ofp_type_to_string(type), str_extra, len );
+
 
     if (tree) { /* we are being asked for details */
         proto_item *item        = NULL;
@@ -2935,7 +2930,7 @@ static void dissect_openflow_message(tvbuff_t *tvb, packet_info *pinfo, proto_tr
                 col_set_writable( pinfo->cinfo, FALSE);
 
                 /* Finally do the dissection */
-                dissect_openflow_message(next_tvb, pinfo, data_tree);
+                dissect_openflow_message(next_tvb, pinfo, data_tree, data);
 
                 col_set_writable( pinfo->cinfo, writeable);
 
@@ -3417,10 +3412,12 @@ static void dissect_openflow_message(tvbuff_t *tvb, packet_info *pinfo, proto_tr
             add_child_str(tree, ofp_header_warn_type, tvb, &offset, len - offset, str);
         }
     }
+    return tvb_length(tvb);
 }
 
-static void dissect_openflow(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+static int dissect_openflow(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
     /* have wireshark reassemble our PDUs; call dissect_openflow_when full PDU assembled */
-    tcp_dissect_pdus(tvb, pinfo, tree, TRUE, 4, get_openflow_message_len, dissect_openflow_message);
+  tcp_dissect_pdus(tvb, pinfo, tree, TRUE, 4, get_openflow_message_len, dissect_openflow_message, data);
+  return tvb_length(tvb);
 }
